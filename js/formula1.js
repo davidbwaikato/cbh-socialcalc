@@ -3430,6 +3430,7 @@ SocialCalc.Formula.FunctionList["EXACT"] = [SocialCalc.Formula.ExactFunction, 2,
 # TRIM(string)
 # HEXCODE(string)
 # UPPER(string)
+# OCCURS(regexp-key,string)
 #
 */
 
@@ -3451,7 +3452,8 @@ SocialCalc.Formula.ArgList = {
                 SUBSTITUTE: [1, 1, 1, 0],
                 TRIM: [1],
                 HEXCODE: [1],
-                UPPER: [1]
+                UPPER: [1],
+                OCCURS: [1, 1]
                };
 
 SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
@@ -3653,6 +3655,34 @@ SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
          resulttype = "t";
          break;
 
+      case "OCCURS": // CBH
+       if (offset < 0) {
+           result = "Start is before string"; // !! not displayed, no need to translate
+       }
+       else {
+	   // from https://stackoverflow.com/questions/1072765/count-number-of-matches-of-a-regex-in-javascript
+	   var cbh_count_occurs = function(re_str,str) {
+	       
+	       var re;
+	       if (re_str.indexOf("/")==0) {
+		   re = eval(re_str);
+	       }
+	       else {
+		   re = new RegExp(re_str,"g");
+	       }
+	       return ((str || '').match(re) || []).length;
+	   }
+	   //console.log("*** away to call cbh_count_occurs(), operand_value = : " + JSON.stringify(operand_value)); // ****
+           result = cbh_count_occurs(operand_value[1],operand_value[2]);
+           if (result >= 0) {
+               resulttype = "n";
+           }
+           else {
+               result = "Not found"; // !! not displayed, error is e#VALUE!
+           }
+       }
+       break;
+       
       }
 
    scf.PushOperand(operand, resulttype, result);
@@ -3673,7 +3703,7 @@ SocialCalc.Formula.FunctionList["SUBSTITUTE"] = [SocialCalc.Formula.StringFuncti
 SocialCalc.Formula.FunctionList["TRIM"] = [SocialCalc.Formula.StringFunctions, 1, "v", "", "text"];
 SocialCalc.Formula.FunctionList["HEXCODE"] = [SocialCalc.Formula.StringFunctions, 1, "v", "", "text"];
 SocialCalc.Formula.FunctionList["UPPER"] = [SocialCalc.Formula.StringFunctions, 1, "v", "", "text"];
-
+SocialCalc.Formula.FunctionList["OCCURS"] = [SocialCalc.Formula.StringFunctions, 2, "occurs", "", "text"];
 /*
 #
 # is_functions:
