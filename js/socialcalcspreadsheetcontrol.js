@@ -2369,7 +2369,7 @@ SocialCalc.SpreadsheetControl.HideFunctions = function() {
    }
 
 SocialCalc.SpreadsheetControl.DoFunctionPaste = function() {
-
+    console.log("*** SpreadsheetControl.DoFunctionPaste() called");
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var editor = spreadsheet.editor;
    var ele = document.getElementById(spreadsheet.idPrefix+"functionname");
@@ -2384,7 +2384,8 @@ SocialCalc.SpreadsheetControl.DoFunctionPaste = function() {
       mele.focus();
       SocialCalc.CmdGotFocus(mele);
       }
-   else {
+    else {
+	console.log("**** calling EditorAddToInput with text="+text);
       editor.EditorAddToInput(text, "=");
       }
 
@@ -2423,17 +2424,56 @@ SocialCalc.SpreadsheetControl.DoMultiline = function() {
          break;
       }
 
+    // CBH
+    console.log("**** DoMultiline() text = " + text);
+    if (text.match(/^\s*'?\.html\s*$/m)) {
+	text = text.replace(/\s*'?\.html\s*/g,"");
+    }
+    else {
+	text = SocialCalc.special_chars(text);
+    }
+    // if top-level node is a div tag with class="richtext-html"
+    // then remove it to take away the (max-height overflow-y) settings
+    var wrapper_div_text_elems = document.createElement("div");
+    wrapper_div_text_elems.innerHTML = text;
+    var text_elems = wrapper_div_text_elems.childNodes;
+    if ((text_elems.length == 1) && (text_elems[0].tagName == "DIV")) {
+	var text_elem = text_elems[0];
+	console.log("*** text elem = " + text_elem.toString());
+	if (text_elem.className == "richtext-html") {
+	    text = text_elem.innerHTML;
+	}
+    }
+    
    editor.inputBox.element.disabled = true;
 
-   text = SocialCalc.special_chars(text);
-
-   str = '<textarea id="'+idp+'textarea" style="width:380px;height:120px;margin:10px 0px 0px 6px;">'+text+'</textarea>'+
-         '<div style="width:380px;text-align:right;padding:6px 0px 4px 6px;font-size:small;">'+
+    str = "";
+    /*
+    str += '<script src="https://cdn.ckeditor.com/ckeditor5/10.0.1/classic/ckeditor.js"></script>'
+    str += '<textarea id="'+idp+'textarea" style="width:680px;height:120px;margin:10px 0px 0px 6px;">'+text+'</textarea>'+
+         '<div style="width:680px;text-align:right;padding:6px 0px 4px 6px;font-size:small;">'+
+*/
+   str += '<div contenteditable="" id="'+idp+'textarea" style="width:680px;height:120px;margin:0px 10px 10px 10px; background-color: white; resize: both; overflow: auto;">'+text+'</div>'+ 
+        '<div style="width:680px;text-align:right;padding:6px 0px 4px 6px;font-size:small;">'+
+	'<input type="checkbox" id="split-multiline-checkbox">'+
+	'<label for="split-multiline-checkbox">Split Cell Contens on Set</label> '+
          SCLocSS('<input type="button" value="%loc!Set Cell Contents!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoMultilinePaste();">&nbsp;'+
          '<input type="button" value="%loc!Clear!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoMultilineClear();">&nbsp;'+
          '<input type="button" value="%loc!Cancel!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.HideMultiline();"></div>'+
          '</div>');
-
+/*
+    str += '<script>\n';
+    str += '  var ckeditor=ClassicEditor\n';
+    str += '	.create( document.querySelector( "#'+idp+'textarea" ) )\n';
+    str += '	.then( editor => {\n';
+    str += '		console.log( editor );\n';
+    str += '	} )\n';
+    str += '	.catch( error => {\n';
+    str += '		console.error( error );\n';
+    str += '	} );\n';
+    str += '	console.log("****!!!! created ckeditor");\n';
+    str += '</script>    \n';
+*/
    var main = document.createElement("div");
    main.id = idp+"dialog";
 
@@ -2448,10 +2488,10 @@ SocialCalc.SpreadsheetControl.DoMultiline = function() {
    main.style.backgroundColor = "#FFF";
    main.style.border = "1px solid black";
 
-   main.style.width = "400px";
+   //main.style.width = "400px"; // CBH
 
    main.innerHTML = '<table cellspacing="0" cellpadding="0" style="border-bottom:1px solid black;"><tr>'+
-      '<td style="font-size:10px;cursor:default;width:100%;background-color:#999;color:#FFF;">'+
+      '<td style="font-size:10px;cursor:default;width:680px;background-color:#999;color:#FFF;">'+ // CBH
       SCLocSS("&nbsp;%loc!Multi-line Input Box!")+'</td>'+
       '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideMultiline();">&nbsp;X&nbsp;</td></tr></table>'+
       '<div style="background-color:#DDD;">'+str+'</div>';
@@ -2510,21 +2550,37 @@ SocialCalc.SpreadsheetControl.DoMultilineClear = function() {
 
    var ele = document.getElementById(spreadsheet.idPrefix+"multilinetextarea");
 
-   ele.value = "";
+   //ele.value = "";
+   ele.innerHTML = ""; // CBH
    ele.focus();
 
    }
 
 
 SocialCalc.SpreadsheetControl.DoMultilinePaste = function() {
-
+    console.log("**** SpreadsheetControl.DoMultilinePaste()")
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var editor = spreadsheet.editor;
    var wval = editor.workingvalues;
 
    var ele = document.getElementById(spreadsheet.idPrefix+"multilinetextarea");
 
-   var text = ele.value;
+    //var text = ele.value;
+    // CBH
+   var text;
+   if (ele.innerText.match(/^\s*'?\.html\s*$/m)) {
+       text = ele.innerText; 
+   }
+    else {
+	var maxheight_div = document.createElement("div");
+	maxheight_div.setAttribute("class","richtext-html");
+	
+	maxheight_div.style.maxHeight = "300px";
+	maxheight_div.style.overflowY = "auto";
+	maxheight_div.innerHTML = ele.innerHTML;
+	
+       text = ".html\n\n" + maxheight_div.outerHTML + "\n\n.html\n";
+   }
 
    SocialCalc.SpreadsheetControl.HideMultiline();
 
