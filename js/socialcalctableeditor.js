@@ -2345,6 +2345,13 @@ SocialCalc.EditorSaveEdit = function(editor, text) {
          type = "text "+valueinfo.type;
          }
       }
+   else if (fch=="/") { //CBH regex
+      type = "text t"; //TODO regex subtype?
+      valueinfo = SocialCalc.DetermineValueType(value); // determine type again (?)
+      if (valueinfo.type.charAt(0)=="t") {
+         type = "text "+valueinfo.type;
+         }
+      }
    else if (value.length==0) {
       type = "empty";
       }

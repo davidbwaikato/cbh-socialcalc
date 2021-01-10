@@ -35,16 +35,16 @@
    if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
                                      // In any case, requires SocialCalc.Constants.
 
-SocialCalc.Formula = {};
+if (!SocialCalc.Formula) SocialCalc.Formula = {};
 SocialCalc.TriggerIoAction = {}; // eddy
 
 //
 // Formula constants for parsing:
 //
 
-   SocialCalc.Formula.ParseState = {num: 1, alpha: 2, coord: 3, string: 4, stringquote: 5, numexp1: 6, numexp2: 7, alphanumeric: 8, specialvalue:9};
+   SocialCalc.Formula.ParseState = {num: 1, alpha: 2, coord: 3, string: 4, stringquote: 5, numexp1: 6, numexp2: 7, alphanumeric: 8, specialvalue:9, regex1:10, regex2:11, regex3: 12};
 
-   SocialCalc.Formula.TokenType = {num: 1, coord: 2, op: 3, name: 4, error: 5, string: 6, space: 7};
+   SocialCalc.Formula.TokenType = {num: 1, coord: 2, op: 3, name: 4, error: 5, string: 6, space: 7, regex: 8};
 
    SocialCalc.Formula.CharClass = {num: 1, numstart: 2, op: 3, eof: 4, alpha: 5, incoord: 6, error: 7, quote: 8, space: 9, specialstart: 10};
  
@@ -178,7 +178,6 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
          ch = "";
          cclass = charclass.eof;
          }
-
       if (state == parsestate.num) {
          if (cclass == charclass.num) {
             str += ch;
@@ -326,6 +325,30 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
             }
          }
 
+      //CBH
+      if (state == parsestate.regex1) {
+         str += ch;
+         if (ch == '/') {
+            state = parsestate.regex3;
+            }
+         else if (ch == '\\') {
+            state = parsestate.regex2;
+            }
+         }
+      else if (state == parsestate.regex2) {
+         str += ch;
+         state = parsestate.regex1;
+         }
+      else if (state == parsestate.regex3) {
+         if (cclass == charclass.alpha) {
+            str += ch;
+            }
+         else {
+            pushtoken(parseinfo, str, tokentype.regex, 0);
+            state = 0;
+            }
+         }
+
       if (state == 0) {
          if (cclass == charclass.num) {
             str = ch;
@@ -371,45 +394,53 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
                last_token_type = charclass.eof;
                last_token_text = "EOF";
                }
-            t = tokentype.op;
-            if ((parseinfo.length == 0)
-                || (last_token_type == charclass.op && last_token_text != ')' && last_token_text != '%')) { // Unary operator
-               if (str == '-') { // M is unary minus
-                  str = "M";
-                  ch = "M";
-                  }
-               else if (str == '+') { // P is unary plus
-                  str = "P";
-                  ch = "P";
-                  }
-               else if (str == ')' && last_token_text == '(') { // null arg list OK
-                  ;
-                  }
-               else if (str != '(') { // binary-op open-paren OK, others no
-                  t = tokentype.error;
-                  str = scc.s_parseerrtwoops;
-                  }
+            
+            if (str == "/") { //CBH start regex
+               if (parseinfo.length == 0 || last_token_text == "(" || last_token_text == ',') {
+                  state = parsestate.regex1;
+                  } 
                }
-            else if (str.length > 1) {
-               if (str == '>=') { // G is >=
-                  str = "G";
-                  ch = "G";
+            else {
+               t = tokentype.op;
+               if ((parseinfo.length == 0)
+                   || (last_token_type == charclass.op && last_token_text != ')' && last_token_text != '%')) { // Unary operator
+                  if (str == '-') { // M is unary minus
+                     str = "M";
+                     ch = "M";
+                     }
+                  else if (str == '+') { // P is unary plus
+                     str = "P";
+                     ch = "P";
+                     }
+                  else if (str == ')' && last_token_text == '(') { // null arg list OK
+                     ;
+                     }
+                  else if (str != '(') { // binary-op open-paren OK, others no
+                     t = tokentype.error;
+                     str = scc.s_parseerrtwoops;
+                     }
                   }
-               else if (str == '<=') { // L is <=
-                  str = "L";
-                  ch = "L";
+               else if (str.length > 1) {
+                  if (str == '>=') { // G is >=
+                     str = "G";
+                     ch = "G";
+                     }
+                  else if (str == '<=') { // L is <=
+                     str = "L";
+                     ch = "L";
+                     }
+                  else if (str == '<>') { // N is <>
+                     str = "N";
+                     ch = "N";
+                     }
+                  else {
+                     t = tokentype.error;
+                     str = scc.s_parseerrtwoops;
+                     }
                   }
-               else if (str == '<>') { // N is <>
-                  str = "N";
-                  ch = "N";
-                  }
-               else {
-                  t = tokentype.error;
-                  str = scc.s_parseerrtwoops;
-                  }
+               pushtoken(parseinfo, str, t, ch);
+               state = 0;
                }
-            pushtoken(parseinfo, str, t, ch);
-            state = 0;
             }
          else if (cclass == charclass.quote) { // starting a string
             str = "";
@@ -425,7 +456,6 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
             }
          }
       }
-
    return parseinfo;
 
    }
@@ -499,7 +529,7 @@ SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
       pii = parseinfo[i];
       ttype = pii.type;
       ttext = pii.text;
-      if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string) {
+      if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string || ttype == tokentype.regex) {
          revpolish.push(i);
          }
       else if (ttype == tokentype.name) {
@@ -850,7 +880,11 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
 		 
          }
 
-		 
+      //CBH //TODO Verify valid regex?
+      else if (ttype == tokentype.regex) {
+         PushOperand("t", ttext);
+         }
+
       else {
          errortext = scc.s_InternalError+"Unknown token "+ttype+" ("+ttext+"). ";
          break;
@@ -2001,7 +2035,6 @@ SocialCalc.Formula.CheckForErrorValue = function(operand, v) {
 //
 
 SocialCalc.Formula.FillFunctionInfo = function() {
-
    var scf = SocialCalc.Formula;
    var scc = SocialCalc.Constants;
 
@@ -3655,36 +3688,7 @@ SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
          resulttype = "t";
          break;
 
-      case "OCCURS": // CBH
-       if (offset < 0) {
-           result = "Start is before string"; // !! not displayed, no need to translate
-       }
-       else {
-	   // from https://stackoverflow.com/questions/1072765/count-number-of-matches-of-a-regex-in-javascript
-	   var cbh_count_occurs = function(re_str,str) {
-	       
-	       var re;
-	       if (re_str.indexOf("/")==0) {
-		   re = eval(re_str);
-	       }
-	       else {
-		   re = new RegExp(re_str,"g");
-	       }
-	       return ((str || '').match(re) || []).length;
-	   }
-	   //console.log("*** away to call cbh_count_occurs(), operand_value = : " + JSON.stringify(operand_value)); // ****
-           result = cbh_count_occurs(operand_value[1],operand_value[2]);
-           if (result >= 0) {
-               resulttype = "n";
-           }
-           else {
-               result = "Not found"; // !! not displayed, error is e#VALUE!
-           }
-       }
-       break;
-       
       }
-
    scf.PushOperand(operand, resulttype, result);
    return;
 
@@ -3703,7 +3707,7 @@ SocialCalc.Formula.FunctionList["SUBSTITUTE"] = [SocialCalc.Formula.StringFuncti
 SocialCalc.Formula.FunctionList["TRIM"] = [SocialCalc.Formula.StringFunctions, 1, "v", "", "text"];
 SocialCalc.Formula.FunctionList["HEXCODE"] = [SocialCalc.Formula.StringFunctions, 1, "v", "", "text"];
 SocialCalc.Formula.FunctionList["UPPER"] = [SocialCalc.Formula.StringFunctions, 1, "v", "", "text"];
-SocialCalc.Formula.FunctionList["OCCURS"] = [SocialCalc.Formula.StringFunctions, 2, "occurs", "", "text"];
+
 /*
 #
 # is_functions:

@@ -3,6 +3,7 @@ var concat = require('gulp-concat');
 var uglify = require('gulp-uglify');
 var filesExist = require('files-exist');
 var jshint = require('gulp-jshint');
+var socialCalcAddons = require('./socialcalc-addons');
 
 var js_folder = './js/';
 var css_folder = './css/';
@@ -19,8 +20,12 @@ var js_files = [
     js_folder + 'formula1.js',
     js_folder + 'socialcalcpopup.js',
     js_folder + 'socialcalcspreadsheetcontrol.js',
-    js_folder + 'socialcalcviewer.js'
+    js_folder + 'socialcalcviewer.js',
+    js_folder + 'lib/htmlsanitiser.js',
+    js_folder + 'lib/beautify-html.js',
 ];
+
+js_files.push(...socialCalcAddons.getAddons("./js/addons/"));
 
 var css_files = [
     css_folder + 'socialcalc.css'

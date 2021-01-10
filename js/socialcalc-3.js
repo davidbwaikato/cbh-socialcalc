@@ -5569,7 +5569,7 @@ SocialCalc.GetCellContents = function(sheetobj, coord) {
             result = cellobj.datavalue+"";
             break;
          case "t":
-            result = "'"+cellobj.datavalue;
+            result = cellobj.datavalue.startsWith("/") ? cellobj.datavalue : "'"+cellobj.datavalue; //CBH Added for regex
             break;
          case "f":
             result = "="+cellobj.formula;
